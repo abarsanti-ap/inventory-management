@@ -5,6 +5,45 @@
       <p>{{ t('orders.description') }}</p>
     </div>
 
+    <div v-if="restockingOrders.length > 0" class="card restocking-orders-card">
+      <div class="card-header">
+        <h3 class="card-title">
+          Restocking Orders ({{ restockingOrders.length }})
+          <span class="badge info restocking-badge">Restocking</span>
+        </h3>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Items</th>
+              <th>Total Value</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Expected Delivery</th>
+              <th>Lead Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="rOrder in restockingOrders" :key="rOrder.id">
+              <td><strong>{{ rOrder.order_number }}</strong></td>
+              <td>{{ rOrder.items.length }} items</td>
+              <td><strong>{{ currencySymbol }}{{ rOrder.total_value.toLocaleString() }}</strong></td>
+              <td>
+                <span :class="['badge', getRestockingStatusClass(rOrder.status)]">
+                  {{ rOrder.status }}
+                </span>
+              </td>
+              <td>{{ formatDate(rOrder.order_date) }}</td>
+              <td>{{ formatDate(rOrder.expected_delivery) }}</td>
+              <td>7 days</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
@@ -95,6 +134,7 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
+    const restockingOrders = ref([])
 
     // Use shared filters
     const {
@@ -143,6 +183,16 @@ export default {
       return statusMap[status] || 'info'
     }
 
+    const getRestockingStatusClass = (status) => {
+      const statusMap = {
+        'Processing': 'warning',
+        'Shipped': 'info',
+        'Delivered': 'success',
+        'Cancelled': 'danger'
+      }
+      return statusMap[status] || 'info'
+    }
+
     const formatDate = (dateString) => {
       const { currentLocale } = useI18n()
       const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
@@ -153,15 +203,28 @@ export default {
       })
     }
 
-    onMounted(loadOrders)
+    const loadRestockingOrders = async () => {
+      try {
+        restockingOrders.value = await api.getRestockingOrders()
+      } catch (err) {
+        console.error('Failed to load restocking orders:', err)
+      }
+    }
+
+    onMounted(() => {
+      loadOrders()
+      loadRestockingOrders()
+    })
 
     return {
       t,
       loading,
       error,
       orders,
+      restockingOrders,
       getOrdersByStatus,
       getOrderStatusClass,
+      getRestockingStatusClass,
       formatDate,
       currencySymbol,
       translateProductName,
@@ -172,6 +235,15 @@ export default {
 </script>
 
 <style scoped>
+.restocking-orders-card {
+  margin-bottom: 1.25rem;
+}
+
+.restocking-badge {
+  margin-left: 0.625rem;
+  vertical-align: middle;
+}
+
 /* Fixed table layout to prevent column shifting */
 .orders-table {
   table-layout: fixed;
